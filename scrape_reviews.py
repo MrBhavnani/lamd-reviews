@@ -64,6 +64,47 @@ def handle_consent(page):
             return
 
 
+CID_PATTERNS = [
+    r"ludocid(?:=|\\u003d|%3D)(\d{6,})",
+    r"[?&]cid=(\d{6,})",
+    r"0x[0-9a-fA-F]+:0x([0-9a-fA-F]{6,})",
+]
+
+
+def resolve_to_maps(page):
+    """share.google links often open a Google Search business panel, not Maps.
+    Find the listing's CID on that page and jump to its Maps page."""
+    if "/sorry/" in page.url:
+        raise RuntimeError("Google showed an 'unusual traffic' CAPTCHA page (request blocked)")
+    if "/maps" in page.url:
+        return
+    html = page.content()
+    for i, pat in enumerate(CID_PATTERNS):
+        m = re.search(pat, html)
+        if m:
+            cid = m.group(1)
+            if i == 2:  # hex feature id -> decimal CID
+                cid = str(int(cid, 16))
+            url = f"https://www.google.com/maps?cid={cid}&hl=en"
+            log(f"Search panel detected - opening Maps listing via CID {cid}")
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            handle_consent(page)
+            page.wait_for_timeout(2500)
+            log(f"Now on: {page.url[:160]}")
+            return
+    # Last resort: click any link into Maps
+    link = page.locator('a[href*="/maps/place/"], a[href*="maps.google.com"]')
+    if link.count():
+        href = link.first.get_attribute("href")
+        if href.startswith("/"):
+            href = "https://www.google.com" + href
+        log(f"Following Maps link: {href[:120]}")
+        page.goto(with_english(href), wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(2500)
+        return
+    log("Could not find a Maps link or CID on the landing page")
+
+
 def open_reviews_tab(page):
     candidates = [
         page.get_by_role("tab", name=re.compile(r"^Reviews", re.I)),
@@ -234,6 +275,8 @@ def scrape():
             launch_args["executable_path"] = CHROME_PATH
         browser = p.chromium.launch(**launch_args)
         ctx = browser.new_context(
+            user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"),
             locale="en-US",
             timezone_id="America/Los_Angeles",
             viewport={"width": 1366, "height": 900},
@@ -243,10 +286,13 @@ def scrape():
             log(f"Opening {MAPS_URL}")
             page.goto(with_english(MAPS_URL), wait_until="domcontentloaded", timeout=60000)
             handle_consent(page)
-            # share.google redirects into maps; make sure we end on a page in English
-            if "google.com/maps" in page.url and "hl=en" not in page.url:
+            page.wait_for_timeout(2500)
+            log(f"Landed on: {page.url[:160]}  (title: {page.title()[:80]!r})")
+            resolve_to_maps(page)
+            # make sure we end on a Maps page in English
+            if "/maps" in page.url and "hl=en" not in page.url:
                 page.goto(with_english(page.url), wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_selector("h1", timeout=30000)
+            page.wait_for_selector("h1", timeout=45000)
             page.wait_for_timeout(2500)
             maps_url = page.url.split("?")[0]
 
@@ -267,6 +313,13 @@ def scrape():
             reviews = page.evaluate(EXTRACT_JS)
         except Exception as e:
             DEBUG_DIR.mkdir(exist_ok=True)
+            try:
+                log(f"Failure URL: {page.url[:200]}")
+                log(f"Failure title: {page.title()[:120]!r}")
+                body = re.sub(r"\s+", " ", page.inner_text("body"))[:600]
+                log(f"Failure page text: {body}")
+            except Exception:
+                pass
             try:
                 page.screenshot(path=str(DEBUG_DIR / "failure.png"), full_page=True)
                 (DEBUG_DIR / "failure.html").write_text(page.content(), encoding="utf-8")
