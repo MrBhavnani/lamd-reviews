@@ -106,7 +106,8 @@ def resolve_to_maps(page):
                 if first.count():
                     first.first.click()
                     page.wait_for_timeout(4000)
-            if page.locator("h1").count():
+            h1 = page.locator("h1")
+            if h1.count() and h1.first.inner_text().strip().lower() not in ("this area", "results", ""):
                 log(f"Maps listing opened: {page.url[:160]}")
                 return
         raise RuntimeError("Google blocked the request with a CAPTCHA on both Search and Maps")

@@ -28,7 +28,7 @@ jobs:
 
       - name: Scrape
         env:
-          MAPS_URL: ${{ vars.MAPS_URL || 'https://share.google/alMa8plwDqF9weM5B' }}
+          MAPS_URL: ${{ vars.MAPS_URL || 'https://www.google.com/maps?cid=11857656974798046533' }}
           KEYWORD: ${{ vars.KEYWORD || 'Rajesh' }}
         run: python scrape_reviews.py
 
