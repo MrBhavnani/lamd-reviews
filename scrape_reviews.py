@@ -1,0 +1,326 @@
+"""
+Scrape Google Maps reviews for one business and keep only those that mention a keyword.
+
+Output: reviews.json  (read by the Wix embed)
+
+Config (environment variables):
+  MAPS_URL      Google Maps link to the listing (a share.google link works)   [required]
+  KEYWORD       Word to match, case-insensitive, whole word                    [default: Rajesh]
+  OUTPUT        Output file path                                               [default: reviews.json]
+  MAX_SCROLLS   Safety cap on scroll iterations                                [default: 400]
+  HEADLESS      "0" to watch the browser locally                               [default: 1]
+  CHROME_PATH   Optional path to a Chrome binary (local testing)
+
+Exit codes:
+  0  success (file written)
+  1  scrape failed or loaded zero reviews -> existing reviews.json is left untouched
+"""
+
+import json
+import os
+import re
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+from playwright.sync_api import TimeoutError as PWTimeout
+from playwright.sync_api import sync_playwright
+
+MAPS_URL = os.environ.get("MAPS_URL", "").strip()
+KEYWORD = os.environ.get("KEYWORD", "Rajesh").strip()
+OUTPUT = Path(os.environ.get("OUTPUT", "reviews.json"))
+MAX_SCROLLS = int(os.environ.get("MAX_SCROLLS", "400"))
+HEADLESS = os.environ.get("HEADLESS", "1") != "0"
+CHROME_PATH = os.environ.get("CHROME_PATH") or None
+DEBUG_DIR = Path("debug")
+
+KW_RE = re.compile(r"\b" + re.escape(KEYWORD) + r"\b", re.IGNORECASE)
+
+
+def log(msg):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def with_english(url: str) -> str:
+    """Force English UI so labels/dates are predictable."""
+    if "google." in url and "hl=" not in url:
+        url += ("&" if "?" in url else "?") + "hl=en"
+    return url
+
+
+# ---------------------------------------------------------------- page steps
+
+def handle_consent(page):
+    """EU-style cookie wall. Usually absent on US runners."""
+    if "consent." not in page.url:
+        return
+    log("Consent page detected - rejecting non-essential cookies")
+    for label in ["Reject all", "Accept all", "I agree"]:
+        btn = page.get_by_role("button", name=re.compile(label, re.I))
+        if btn.count():
+            btn.first.click()
+            page.wait_for_load_state("domcontentloaded")
+            return
+
+
+def open_reviews_tab(page):
+    candidates = [
+        page.get_by_role("tab", name=re.compile(r"^Reviews", re.I)),
+        page.locator('button[aria-label^="Reviews for"]'),
+        page.locator('button[jsaction*="reviewChart"]'),
+        page.get_by_role("button", name=re.compile(r"[\d,]+\s+reviews?", re.I)),
+    ]
+    for loc in candidates:
+        try:
+            if loc.count():
+                loc.first.click(timeout=5000)
+                page.wait_for_selector("div[data-review-id]", timeout=15000)
+                log("Reviews tab opened")
+                return True
+        except PWTimeout:
+            continue
+    return page.locator("div[data-review-id]").count() > 0
+
+
+def sort_newest(page):
+    """Best-effort: sorting by newest makes new reviews load first."""
+    try:
+        sort_btn = page.locator('button[aria-label*="Sort"], button[data-value="Sort"]')
+        if not sort_btn.count():
+            return
+        sort_btn.first.click(timeout=4000)
+        item = page.get_by_role("menuitemradio", name=re.compile("Newest", re.I))
+        item.first.click(timeout=4000)
+        page.wait_for_timeout(2000)
+        log("Sorted by newest")
+    except Exception:
+        log("Sort control not found - continuing with default order")
+
+
+SCROLL_JS = """
+() => {
+  const first = document.querySelector('div[data-review-id]');
+  if (!first) return -1;
+  let el = first.parentElement;
+  while (el && el !== document.body) {
+    const s = getComputedStyle(el);
+    if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 10) {
+      el.scrollTop = el.scrollHeight;
+      return el.scrollHeight;
+    }
+    el = el.parentElement;
+  }
+  window.scrollTo(0, document.body.scrollHeight);
+  return document.body.scrollHeight;
+}
+"""
+
+COUNT_JS = """
+() => new Set([...document.querySelectorAll('div[data-review-id]')].map(e => e.getAttribute('data-review-id'))).size
+"""
+
+EXPAND_JS = """
+() => {
+  let n = 0;
+  document.querySelectorAll('button[aria-label="See more"], button.w8nwRe, button[jsaction*="review.expandReview"]').forEach(b => {
+    try { b.click(); n++; } catch (e) {}
+  });
+  return n;
+}
+"""
+
+EXTRACT_JS = r"""
+() => {
+  // Group nodes by review id, keep the outermost node for each id.
+  const byId = new Map();
+  document.querySelectorAll('div[data-review-id]').forEach(el => {
+    const id = el.getAttribute('data-review-id');
+    const prev = byId.get(id);
+    if (!prev || el.contains(prev)) byId.set(id, el);
+  });
+
+  const out = [];
+  byId.forEach((el, id) => {
+    const q = s => el.querySelector(s);
+
+    // Author
+    let author = (q('.d4r55') || {}).textContent || el.getAttribute('aria-label') || '';
+    author = author.trim();
+
+    // Author profile link + photo
+    const contrib = q('[data-href*="/maps/contrib/"]') || q('a[href*="/maps/contrib/"]');
+    const authorUrl = contrib ? (contrib.getAttribute('data-href') || contrib.getAttribute('href') || '') : '';
+    const img = (contrib && contrib.querySelector('img')) || q('img[src*="googleusercontent"]');
+    const photo = img ? img.getAttribute('src') || '' : '';
+
+    // Rating: "5 stars" aria-label, or "5/5" text for some layouts
+    let rating = null;
+    const starEl = q('[role="img"][aria-label*="star"]');
+    if (starEl) {
+      const m = starEl.getAttribute('aria-label').match(/(\d(?:\.\d)?)/);
+      if (m) rating = parseFloat(m[1]);
+    }
+    if (rating === null) {
+      const m = (el.textContent || '').match(/\b([1-5])\/5\b/);
+      if (m) rating = parseInt(m[1], 10);
+    }
+
+    // Date (relative text from Google, e.g. "3 months ago")
+    const dateEl = q('.rsqaWe') || q('.xRkPPb');
+    let date = dateEl ? dateEl.textContent.trim() : '';
+    date = date.replace(/\s*on\s*Google\s*$/i, '').trim();
+
+    // Review body: first .wiI7pd that is NOT inside the owner's response
+    let text = '';
+    for (const t of el.querySelectorAll('.wiI7pd')) {
+      if (!t.closest('.CDe7pd')) { text = t.textContent.trim(); break; }
+    }
+
+    // Owner response (optional)
+    const resp = q('.CDe7pd .wiI7pd');
+    const ownerResponse = resp ? resp.textContent.trim() : '';
+
+    out.push({ id, author, author_url: authorUrl, photo, rating, date, text, owner_response: ownerResponse });
+  });
+  return out;
+}
+"""
+
+PLACE_JS = r"""
+() => {
+  const name = (document.querySelector('h1') || {}).textContent || '';
+  let rating = null, total = null;
+  const header = document.querySelector('div.F7nice') || document.querySelector('[role="main"]');
+  if (header) {
+    const t = header.textContent || '';
+    const r = t.match(/(\d\.\d)/); if (r) rating = parseFloat(r[1]);
+    const c = t.match(/\(([\d,]+)\)/) || t.match(/([\d,]+)\s+reviews?/i);
+    if (c) total = parseInt(c[1].replace(/,/g, ''), 10);
+  }
+  return { name: name.trim(), rating, total };
+}
+"""
+
+
+def scroll_all(page):
+    last, stalls = -1, 0
+    for i in range(MAX_SCROLLS):
+        page.evaluate(SCROLL_JS)
+        page.wait_for_timeout(1200)
+        n = page.evaluate(COUNT_JS)
+        if n == last:
+            stalls += 1
+            if stalls >= 5:
+                break
+        else:
+            stalls = 0
+            last = n
+        if i % 10 == 0:
+            log(f"  loaded {n} reviews so far")
+    return last
+
+
+# ---------------------------------------------------------------- main
+
+def scrape():
+    if not MAPS_URL:
+        log("MAPS_URL is not set")
+        sys.exit(1)
+
+    with sync_playwright() as p:
+        launch_args = {"headless": HEADLESS, "args": ["--lang=en-US"]}
+        if CHROME_PATH:
+            launch_args["executable_path"] = CHROME_PATH
+        browser = p.chromium.launch(**launch_args)
+        ctx = browser.new_context(
+            locale="en-US",
+            timezone_id="America/Los_Angeles",
+            viewport={"width": 1366, "height": 900},
+        )
+        page = ctx.new_page()
+        try:
+            log(f"Opening {MAPS_URL}")
+            page.goto(with_english(MAPS_URL), wait_until="domcontentloaded", timeout=60000)
+            handle_consent(page)
+            # share.google redirects into maps; make sure we end on a page in English
+            if "google.com/maps" in page.url and "hl=en" not in page.url:
+                page.goto(with_english(page.url), wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_selector("h1", timeout=30000)
+            page.wait_for_timeout(2500)
+            maps_url = page.url.split("?")[0]
+
+            place = page.evaluate(PLACE_JS)
+            log(f"Listing: {place['name']!r}  rating={place['rating']}  total={place['total']}")
+
+            if not open_reviews_tab(page):
+                raise RuntimeError("Could not open the Reviews tab (layout may have changed)")
+            sort_newest(page)
+
+            loaded = scroll_all(page)
+            log(f"Finished scrolling: {loaded} reviews loaded")
+            for _ in range(3):
+                if page.evaluate(EXPAND_JS) == 0:
+                    break
+                page.wait_for_timeout(800)
+
+            reviews = page.evaluate(EXTRACT_JS)
+        except Exception as e:
+            DEBUG_DIR.mkdir(exist_ok=True)
+            try:
+                page.screenshot(path=str(DEBUG_DIR / "failure.png"), full_page=True)
+                (DEBUG_DIR / "failure.html").write_text(page.content(), encoding="utf-8")
+            except Exception:
+                pass
+            log(f"SCRAPE FAILED: {e}")
+            sys.exit(1)
+        finally:
+            browser.close()
+
+    return place, maps_url, reviews
+
+
+def main():
+    place, maps_url, all_reviews = scrape()
+
+    if not all_reviews:
+        log("Zero reviews extracted - refusing to overwrite reviews.json")
+        sys.exit(1)
+
+    matches = [r for r in all_reviews if r["text"] and KW_RE.search(r["text"])]
+    log(f"{len(all_reviews)} reviews scraped, {len(matches)} mention {KEYWORD!r}")
+
+    # Was this a complete load? If yes, replace; if partial, merge with last run
+    # so a slow/partial scrape never drops reviews that were shown before.
+    complete = place.get("total") is not None and len(all_reviews) >= place["total"] * 0.95
+    previous = []
+    if OUTPUT.exists():
+        try:
+            previous = json.loads(OUTPUT.read_text(encoding="utf-8")).get("reviews", [])
+        except Exception:
+            previous = []
+
+    if complete or not previous:
+        final = matches
+    else:
+        log("Partial load detected - merging with previously saved reviews")
+        seen = {r["id"] for r in matches}
+        final = matches + [r for r in previous if r.get("id") not in seen]
+
+    payload = {
+        "place_name": place.get("name"),
+        "place_rating": place.get("rating"),
+        "place_total_reviews": place.get("total"),
+        "maps_url": maps_url,
+        "keyword": KEYWORD,
+        "scraped_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "scraped_review_count": len(all_reviews),
+        "complete_load": complete,
+        "reviews": final,
+    }
+    OUTPUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    log(f"Wrote {len(final)} reviews to {OUTPUT}")
+
+
+if __name__ == "__main__":
+    main()

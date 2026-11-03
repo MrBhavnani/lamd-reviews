@@ -1,0 +1,147 @@
+<!--
+  Google Reviews mentioning "Rajesh" — Wix Embed HTML widget (no API key)
+  ----------------------------------------------------------------------
+  Reads reviews.json that the GitHub scraper refreshes on the 1st and 15th of each month.
+
+  SETUP: change REVIEWS_URL below to your repo, e.g.
+    https://raw.githubusercontent.com/MrBhavnani/lamd-reviews/main/reviews.json
+
+  In Wix: Add Elements → Embed Code → Embed HTML → "Code" → paste this whole file.
+-->
+<meta charset="utf-8">
+<div id="rr-root">
+  <div class="rr-head">
+    <div class="rr-title">What clients say about Rajesh</div>
+    <div class="rr-summary" id="rr-summary"></div>
+  </div>
+  <div class="rr-grid" id="rr-grid"><div class="rr-msg">Loading reviews&hellip;</div></div>
+  <div class="rr-foot">
+    <a id="rr-more" href="#" target="_blank" rel="noopener">See all reviews on Google</a>
+    <span>Reviews from Google</span>
+  </div>
+</div>
+
+<style>
+  :root {
+    --rr-bg: transparent;
+    --rr-card: #ffffff;
+    --rr-text: #1b1f24;
+    --rr-muted: #5f6b76;
+    --rr-accent: #0b5cad;
+    --rr-star: #f5a623;
+    --rr-border: #e3e7eb;
+    --rr-radius: 12px;
+    --rr-font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  html, body { margin: 0; background: var(--rr-bg); }
+  #rr-root { font-family: var(--rr-font); color: var(--rr-text); padding: 16px; box-sizing: border-box; }
+  .rr-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+  .rr-title { font-size: 22px; font-weight: 700; }
+  .rr-summary { font-size: 14px; color: var(--rr-muted); }
+  .rr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .rr-card { background: var(--rr-card); border: 1px solid var(--rr-border); border-radius: var(--rr-radius); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .rr-author { display: flex; align-items: center; gap: 10px; }
+  .rr-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #dfe5ea; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--rr-muted); }
+  .rr-name { font-weight: 600; font-size: 15px; color: var(--rr-text); text-decoration: none; }
+  .rr-name:hover { text-decoration: underline; }
+  .rr-date { font-size: 12px; color: var(--rr-muted); }
+  .rr-stars { color: var(--rr-star); font-size: 16px; letter-spacing: 1px; }
+  .rr-text { font-size: 15px; line-height: 1.55; margin: 0; white-space: pre-line; }
+  .rr-text mark { background: #fff3c4; color: inherit; padding: 0 2px; border-radius: 3px; }
+  .rr-toggle { background: none; border: 0; padding: 0; color: var(--rr-accent); font: inherit; font-size: 14px; cursor: pointer; align-self: flex-start; }
+  .rr-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 16px; font-size: 13px; color: var(--rr-muted); }
+  .rr-foot a { color: var(--rr-accent); text-decoration: none; font-weight: 600; }
+  .rr-msg { color: var(--rr-muted); font-size: 15px; }
+</style>
+
+<script>
+  /* ===== CONFIG ===== */
+  const REVIEWS_URL = "https://raw.githubusercontent.com/MrBhavnani/lamd-reviews/main/reviews.json";
+  const KEYWORD     = "Rajesh";   // used for highlighting only (filtering happens in the scraper)
+  const MAX_CHARS   = 320;        // truncate long reviews (0 = never)
+  const MIN_RATING  = 1;          // set to 4 or 5 to hide lower ratings
+  const MAX_SHOWN   = 0;          // limit how many cards show (0 = all)
+  /* ================== */
+
+  const grid = document.getElementById("rr-grid");
+  const summaryEl = document.getElementById("rr-summary");
+  const moreLink = document.getElementById("rr-more");
+  const kw = KEYWORD.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const kwRegexG = new RegExp("(\\b" + kw + "\\b)", "gi");
+
+  function esc(s) {
+    return String(s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function stars(n) { const r = Math.max(0, Math.min(5, Math.round(n || 0))); return "\u2605".repeat(r) + "\u2606".repeat(5 - r); }
+  function highlight(s) { return esc(s).replace(kwRegexG, "<mark>$1</mark>"); }
+  function safeUrl(u) { return /^https:\/\//i.test(u || "") ? u : ""; }
+
+  function card(r) {
+    const full = r.text || "";
+    const needsCut = MAX_CHARS > 0 && full.length > MAX_CHARS;
+    const short = needsCut ? full.slice(0, MAX_CHARS).replace(/\s+\S*$/, "") + "\u2026" : full;
+    const photo = safeUrl(r.photo), link = safeUrl(r.author_url);
+    const avatar = photo
+      ? `<img class="rr-avatar" src="${esc(photo)}" alt="" referrerpolicy="no-referrer" loading="lazy">`
+      : `<div class="rr-avatar">${esc((r.author || "?").trim().charAt(0).toUpperCase())}</div>`;
+    const name = link
+      ? `<a class="rr-name" href="${esc(link)}" target="_blank" rel="noopener">${esc(r.author)}</a>`
+      : `<span class="rr-name">${esc(r.author)}</span>`;
+
+    const el = document.createElement("div");
+    el.className = "rr-card";
+    el.innerHTML = `
+      <div class="rr-author">${avatar}<div>${name}<div class="rr-date">${esc(r.date)}</div></div></div>
+      ${r.rating ? `<div class="rr-stars" aria-label="${esc(r.rating)} out of 5 stars">${stars(r.rating)}</div>` : ""}
+      <p class="rr-text">${highlight(short)}</p>
+      ${needsCut ? '<button class="rr-toggle">Read more</button>' : ""}`;
+    if (needsCut) {
+      const p = el.querySelector(".rr-text"), b = el.querySelector(".rr-toggle");
+      let open = false;
+      b.addEventListener("click", () => {
+        open = !open;
+        p.innerHTML = highlight(open ? full : short);
+        b.textContent = open ? "Show less" : "Read more";
+      });
+    }
+    // Hide broken avatar images gracefully
+    const img = el.querySelector("img.rr-avatar");
+    if (img) img.addEventListener("error", () => {
+      const d = document.createElement("div");
+      d.className = "rr-avatar";
+      d.textContent = (r.author || "?").trim().charAt(0).toUpperCase();
+      img.replaceWith(d);
+    });
+    return el;
+  }
+
+  async function load() {
+    try {
+      // Cache-bust per hour so updates show quickly without refetching on every page view
+      const bust = Math.floor(Date.now() / 3600000);
+      const res = await fetch(REVIEWS_URL + "?v=" + bust);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+
+      if (data.maps_url) moreLink.href = data.maps_url;
+      if (data.place_rating) {
+        summaryEl.textContent = `${Number(data.place_rating).toFixed(1)} \u2605` +
+          (data.place_total_reviews ? ` \u00b7 ${data.place_total_reviews} Google reviews` : "");
+      }
+
+      let list = (data.reviews || []).filter(r => (r.rating || 5) >= MIN_RATING && r.text);
+      if (MAX_SHOWN > 0) list = list.slice(0, MAX_SHOWN);
+
+      grid.innerHTML = "";
+      if (!list.length) {
+        grid.innerHTML = `<div class="rr-msg">Reviews coming soon.</div>`;
+        return;
+      }
+      list.forEach(r => grid.appendChild(card(r)));
+    } catch (e) {
+      console.error("Could not load reviews:", e);
+      grid.innerHTML = `<div class="rr-msg">Reviews are temporarily unavailable.</div>`;
+    }
+  }
+  load();
+</script>
