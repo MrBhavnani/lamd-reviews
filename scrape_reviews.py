@@ -74,10 +74,42 @@ CID_PATTERNS = [
 def resolve_to_maps(page):
     """share.google links often open a Google Search business panel, not Maps.
     Find the listing's CID on that page and jump to its Maps page."""
-    if "/sorry/" in page.url:
-        raise RuntimeError("Google showed an 'unusual traffic' CAPTCHA page (request blocked)")
-    if "/maps" in page.url:
+    if "/maps" in page.url and "/sorry/" not in page.url:
         return
+
+    # Google Search often blocks datacenter IPs (GitHub runners) with a CAPTCHA.
+    # The blocked URL still carries the knowledge-graph id + business name, so go to Maps instead.
+    from urllib.parse import unquote, parse_qs, urlparse, quote_plus
+    target = page.url
+    if "/sorry/" in target:
+        target = unquote(parse_qs(urlparse(target).query).get("continue", [""])[0])
+    qs = parse_qs(urlparse(target).query)
+    kgmid = (qs.get("kgmid") or [""])[0]
+    name = (qs.get("q") or [""])[0]
+    if kgmid or name:
+        tries = []
+        if kgmid:
+            tries.append(f"https://www.google.com/maps?kgmid={quote_plus(kgmid)}&hl=en")
+        if name:
+            tries.append(f"https://www.google.com/maps/search/{quote_plus(name)}?hl=en")
+        for url in tries:
+            log(f"Trying Maps directly: {url}")
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            handle_consent(page)
+            page.wait_for_timeout(4000)
+            if "/sorry/" in page.url:
+                log("  Maps also returned a CAPTCHA")
+                continue
+            # A search may show a results list instead of the place; open the first result
+            if not page.locator("h1").count():
+                first = page.locator('a[href*="/maps/place/"]')
+                if first.count():
+                    first.first.click()
+                    page.wait_for_timeout(4000)
+            if page.locator("h1").count():
+                log(f"Maps listing opened: {page.url[:160]}")
+                return
+        raise RuntimeError("Google blocked the request with a CAPTCHA on both Search and Maps")
     html = page.content()
     for i, pat in enumerate(CID_PATTERNS):
         m = re.search(pat, html)
