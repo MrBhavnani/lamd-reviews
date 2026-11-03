@@ -157,6 +157,46 @@ def open_reviews_tab(page):
     return page.locator("div[data-review-id]").count() > 0
 
 
+def get_past_limited_view(page):
+    """Signed-out visitors get a 'limited view' with ~5 reviews.
+    1) Try the 'See more reviews' button.  2) Fall back to searching reviews for the keyword.
+    Returns True if we ended up in keyword-search mode."""
+    if page.evaluate(COUNT_JS) > 10:
+        return False
+    log("Limited view detected (few reviews visible)")
+    start_url = page.url
+
+    more = page.locator('button:has-text("See more reviews"), a:has-text("See more reviews")')
+    if more.count():
+        try:
+            more.first.click(timeout=5000)
+            page.wait_for_timeout(4000)
+            log(f"  clicked 'See more reviews' -> {page.url[:140]}  ({page.evaluate(COUNT_JS)} reviews visible)")
+            if "accounts.google" in page.url or "/sorry/" in page.url:
+                log("  that requires sign-in; going back")
+                page.goto(start_url, wait_until="domcontentloaded", timeout=60000)
+                page.wait_for_timeout(3000)
+                open_reviews_tab(page)
+            elif page.evaluate(COUNT_JS) > 10:
+                return False
+        except Exception as e:
+            log(f"  'See more reviews' click failed: {e}")
+
+    try:
+        page.locator('button[aria-label="Search reviews"]').first.click(timeout=5000)
+        box = page.locator('input[aria-label*="Search reviews" i], input[placeholder*="Search reviews" i]')
+        box.first.wait_for(timeout=5000)
+        box.first.fill(KEYWORD)
+        box.first.press("Enter")
+        page.wait_for_timeout(4000)
+        n = page.evaluate(COUNT_JS)
+        log(f"  searched reviews for {KEYWORD!r}: {n} results visible (url {page.url[:120]})")
+        return True
+    except Exception as e:
+        log(f"  review search failed: {e}")
+    return False
+
+
 def sort_newest(page):
     """Best-effort: sorting by newest makes new reviews load first."""
     try:
@@ -343,6 +383,7 @@ def scrape():
             if not open_reviews_tab(page):
                 raise RuntimeError("Could not open the Reviews tab (layout may have changed)")
             sort_newest(page)
+            place["search_mode"] = get_past_limited_view(page)
 
             loaded = scroll_all(page)
             log(f"Finished scrolling: {loaded} reviews loaded")
@@ -394,8 +435,14 @@ def main():
 
     # Was this a complete load? If yes, replace; if partial, merge with last run
     # so a slow/partial scrape never drops reviews that were shown before.
-    complete = place.get("total") is not None and len(all_reviews) >= place["total"] * 0.95
-    if place.get("total") and len(all_reviews) < place["total"] * 0.5:
+    search_mode = place.get("search_mode", False)
+    if search_mode:
+        log("Keyword-search mode: results are merged with previous runs (never shrink)")
+        if not matches:
+            log("Search returned no matching reviews - leaving reviews.json unchanged")
+            sys.exit(1)
+    complete = (not search_mode) and place.get("total") is not None and len(all_reviews) >= place["total"] * 0.95
+    if not search_mode and place.get("total") and len(all_reviews) < place["total"] * 0.5:
         log(f"Only {len(all_reviews)} of {place['total']} reviews loaded - "
             "treating as a failed scrape and leaving reviews.json unchanged")
         sys.exit(1)
