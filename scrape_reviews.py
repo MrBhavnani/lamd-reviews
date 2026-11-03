@@ -165,11 +165,26 @@ def get_past_limited_view(page):
         return False
     log("Limited view detected (few reviews visible)")
     start_url = page.url
+    # Close the sign-in promo panel that can cover the review controls
+    try:
+        d = page.get_by_role("button", name=re.compile(r"^(Dismiss|No thanks|Close)$", re.I))
+        if d.count():
+            d.first.click(timeout=3000)
+            page.wait_for_timeout(1000)
+            log("  dismissed sign-in promo")
+    except Exception:
+        pass
+    state = page.evaluate("""() => [...document.querySelectorAll('button')]
+        .filter(b => /See more reviews|Search reviews/i.test((b.getAttribute('aria-label')||'') + ' ' + b.textContent))
+        .map(b => ({label: (b.getAttribute('aria-label') || b.textContent).trim().slice(0,40),
+                    disabled: b.disabled || b.getAttribute('aria-disabled'),
+                    visible: !!(b.offsetWidth || b.offsetHeight)}))""")
+    log(f"  control state: {state}")
 
     more = page.locator('button:has-text("See more reviews"), a:has-text("See more reviews")')
     if more.count():
         try:
-            more.first.click(timeout=5000)
+            more.first.click(timeout=5000, force=True)
             page.wait_for_timeout(4000)
             log(f"  clicked 'See more reviews' -> {page.url[:140]}  ({page.evaluate(COUNT_JS)} reviews visible)")
             if "accounts.google" in page.url or "/sorry/" in page.url:
@@ -183,7 +198,7 @@ def get_past_limited_view(page):
             log(f"  'See more reviews' click failed: {e}")
 
     try:
-        page.locator('button[aria-label="Search reviews"]').first.click(timeout=5000)
+        page.locator('button[aria-label="Search reviews"]').first.click(timeout=5000, force=True)
         box = page.locator('input[aria-label*="Search reviews" i], input[placeholder*="Search reviews" i]')
         box.first.wait_for(timeout=5000)
         box.first.fill(KEYWORD)
