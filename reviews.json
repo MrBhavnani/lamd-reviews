@@ -1,9 +1,11 @@
 {
-  "place_name": null,
-  "place_rating": null,
-  "place_total_reviews": null,
-  "maps_url": "https://share.google/alMa8plwDqF9weM5B",
+  "place_name": "Equitable Lending",
+  "place_rating": 5,
+  "place_total_reviews": 170,
+  "maps_url": "https://www.google.com/maps/place/Equitable+Lending/@34.0357665,-118.3888569,17z/data=!3m1!4b1!4m6!3m5!1s0x80c2c77b8c155555:0xa48edc31ab454545!8m2!3d34.0357665!4d-118.3888569!16s%2Fg%2F11g8v4mj44",
   "keyword": "Rajesh",
-  "scraped_at": null,
+  "scraped_at": "2026-11-03T15:03:48+00:00",
+  "scraped_review_count": 5,
+  "complete_load": false,
   "reviews": []
 }
