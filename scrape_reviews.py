@@ -281,7 +281,15 @@ def scroll_all(page):
     last, stalls = -1, 0
     for i in range(MAX_SCROLLS):
         page.evaluate(SCROLL_JS)
-        page.wait_for_timeout(1200)
+        # Also scroll with a real mouse wheel over the last review (some layouts only react to wheel events)
+        try:
+            box = page.locator("div[data-review-id]").last.bounding_box()
+            if box:
+                page.mouse.move(box["x"] + box["width"] / 2, box["y"] + min(box["height"] / 2, 50))
+                page.mouse.wheel(0, 4000)
+        except Exception:
+            pass
+        page.wait_for_timeout(1500)
         n = page.evaluate(COUNT_JS)
         if n == last:
             stalls += 1
@@ -338,6 +346,14 @@ def scrape():
 
             loaded = scroll_all(page)
             log(f"Finished scrolling: {loaded} reviews loaded")
+            if place.get("total") and loaded < place["total"] * 0.5:
+                # Diagnose why: look for Google's "limited view" notice and dump nearby text
+                txt = re.sub(r"\s+", " ", page.inner_text("body"))
+                for kw in ["limited", "sign in", "Sign in to", "unusual", "More reviews"]:
+                    k = txt.lower().find(kw.lower())
+                    if k >= 0:
+                        log(f"  page text near {kw!r}: ...{txt[max(0,k-150):k+200]}...")
+                log(f"  buttons on page: {page.eval_on_selector_all('button[aria-label]', 'els => els.map(e => e.getAttribute(\"aria-label\")).filter(Boolean).slice(0,40)')}")
             for _ in range(3):
                 if page.evaluate(EXPAND_JS) == 0:
                     break
@@ -379,6 +395,10 @@ def main():
     # Was this a complete load? If yes, replace; if partial, merge with last run
     # so a slow/partial scrape never drops reviews that were shown before.
     complete = place.get("total") is not None and len(all_reviews) >= place["total"] * 0.95
+    if place.get("total") and len(all_reviews) < place["total"] * 0.5:
+        log(f"Only {len(all_reviews)} of {place['total']} reviews loaded - "
+            "treating as a failed scrape and leaving reviews.json unchanged")
+        sys.exit(1)
     previous = []
     if OUTPUT.exists():
         try:
