@@ -1,11 +1,66 @@
 {
   "place_name": "Equitable Lending",
-  "place_rating": 5,
+  "place_rating": 5.0,
   "place_total_reviews": 170,
-  "maps_url": "https://www.google.com/maps/place/Equitable+Lending/@34.0357665,-118.3888569,17z/data=!3m1!4b1!4m6!3m5!1s0x80c2c77b8c155555:0xa48edc31ab454545!8m2!3d34.0357665!4d-118.3888569!16s%2Fg%2F11g8v4mj44",
-  "keyword": "Rajesh",
-  "scraped_at": "2026-11-03T15:05:38+00:00",
-  "scraped_review_count": 5,
-  "complete_load": false,
-  "reviews": []
+  "maps_url": "https://www.google.com/maps?cid=11857656974798046533",
+  "keyword": "Rajesh|Ragesh|Raj",
+  "scraped_at": "2026-11-03T16:02:28+00:00",
+  "scraped_review_count": 161,
+  "source": "signed-in Chrome",
+  "reviews": [
+    {
+      "id": "979000c86e22",
+      "author": "Jennifer M",
+      "author_url": "https://www.google.com/maps/contrib/116213193677706061565",
+      "photo": "",
+      "rating": 5,
+      "date": "2 months ago",
+      "text": "I had a wonderful experience with Equitable Lending & I especially want to recognize Rajesh Bhavnani for his professionalism, knowledge, and speed. He made the entire process smooth and easy and they closed my DSCR loan in 2 weeks! He took the time to answer all of my questions, the loan terms offered were exactly what he quoted upfront and he was able to schedule a rush appraisal very quickly. His processing team, Anthony and Carolina were very professional and as a real estate investor who has done many loans I can say this was the best loan team I’ve worked with. I highly recommend Rajesh and the team at Equitable Lending to anyone looking for a trustworthy & knowledgeable lending professional!"
+    },
+    {
+      "id": "ae425fc55156",
+      "author": "Ty Upshaw",
+      "author_url": "https://www.google.com/maps/contrib/107368185678562959416",
+      "photo": "",
+      "rating": 5,
+      "date": "2 months ago",
+      "text": "I came across a profile on Zillow that was just full of five star ratings on this one broker named Ragesh Bhavnani.  And here I am now wishing I could give him 10 stars!  Ragesh simply sets the bar sky high for the industry to say the least. I've been in the realestate business for maybe 20yrs on and off,  I've  had a plethora of mortgage brokers close deals for me,  none even come close to the  meticulous attention and expert guidance I got from Ragesh.\nListen people, I would call Ragesh after hours and he would answer every single time!  He got me approved for a VA construction loan to build my dream home in Georgia.   Rajesh took me under his wing and guided me through to the closing table,  and let me tell you,  there were major hurdles along the way and the man never even blinked!!! I'm talking Clint Eastwood cool here folks!,,, he's confident and he's an expert.,,period.  Glad we met my friend, now lets do another new construction deal!!"
+    },
+    {
+      "id": "681fb42bac2e",
+      "author": "Astrid Sanchez",
+      "author_url": "",
+      "photo": "",
+      "rating": 5,
+      "date": "2 months ago",
+      "text": "Rajesh and his team are very thorough and patient. Rajesh took the time to explain everything in detail. No matter what question I had, he responded quickly. I appreciated the process."
+    },
+    {
+      "id": "18b41cc15a4d",
+      "author": "Iris Property Ventures LLC",
+      "author_url": "",
+      "photo": "",
+      "rating": 5,
+      "date": "10 months ago",
+      "text": "Raj and Adrian at Equitable Lending are absolutely incredible! Their speed, responsiveness, and attention to detail blew me away!  I’ve never worked with a team so on top of everything. From start to finish, they made the loan process smooth, effortless, and stress-free, and I always felt completely supported. The fastest close I’ve ever experienced! They are truly the best company I’ve ever come across, and I will always work with Equitable Lending for every property I purchase. If you want a team that delivers results quickly, professionally, and with unmatched care, Raj and Adrian are simply the best!"
+    },
+    {
+      "id": "cd94a09e38e1",
+      "author": "jennette jefferson",
+      "author_url": "",
+      "photo": "",
+      "rating": 5,
+      "date": "a year ago",
+      "text": "Rajesh at Equitable Lending has a special ability to deal with the most challenging issues in the whole refinancing world and he will always deliver what he promises-one way  or another he will get you your mortgage even in the face of more difficult and uncertain twists and turns in the market.\nI recommend Equitable Lending and Rajesh Bhavnani as you are buying peace of mind upfront. Thank you Rajesh. I will be back very soon. You are amazing."
+    },
+    {
+      "id": "0c762e3fa43d",
+      "author": "diana arias",
+      "author_url": "",
+      "photo": "",
+      "rating": 5,
+      "date": "a year ago",
+      "text": "Rajesh and Adrian were perfect. 100% transparency."
+    }
+  ]
 }

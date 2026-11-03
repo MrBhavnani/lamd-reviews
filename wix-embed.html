@@ -57,7 +57,7 @@
 <script>
   /* ===== CONFIG ===== */
   const REVIEWS_URL = "https://raw.githubusercontent.com/MrBhavnani/lamd-reviews/main/reviews.json";
-  const KEYWORD     = "Rajesh";   // used for highlighting only (filtering happens in the scraper)
+  const KEYWORDS    = ["Rajesh", "Ragesh", "Raj"];   // highlighted in the review text
   const MAX_CHARS   = 320;        // truncate long reviews (0 = never)
   const MIN_RATING  = 1;          // set to 4 or 5 to hide lower ratings
   const MAX_SHOWN   = 0;          // limit how many cards show (0 = all)
@@ -66,8 +66,8 @@
   const grid = document.getElementById("rr-grid");
   const summaryEl = document.getElementById("rr-summary");
   const moreLink = document.getElementById("rr-more");
-  const kw = KEYWORD.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const kwRegexG = new RegExp("(\\b" + kw + "\\b)", "gi");
+  const kw = KEYWORDS.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const kwRegexG = new RegExp("\\b(" + kw + ")\\b", "gi");
 
   function esc(s) {
     return String(s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

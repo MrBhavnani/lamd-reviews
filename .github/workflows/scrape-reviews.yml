@@ -1,10 +1,9 @@
 name: Scrape Google reviews
 
 on:
-  # 1st and 15th of every month at 8:17 AM Pacific (15:17 UTC) = roughly every 2 weeks
-  schedule:
-    - cron: "17 15 1,15 * *"
-  # Lets you run it by hand from the Actions tab
+  # Schedule removed: Google limits signed-out visitors to 5 reviews, so this cloud scraper
+  # can't see them. reviews.json is now refreshed from Rajesh's signed-in Chrome by a
+  # Claude scheduled task. Kept for manual runs only.
   workflow_dispatch:
 
 permissions:
