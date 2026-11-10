@@ -33,7 +33,7 @@
   .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
   .head h2 { font-family: "Playfair Display", Georgia, serif; font-weight: 700; font-size: clamp(21px, 2.7vw, 30px); line-height: 1.1; margin: 0; }
   .meta { font-size: 16px; font-weight: 500; color: var(--sub); margin-top: 6px; }
-  .meta a { color: var(--ink); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+  .meta a, .meta a:visited, .meta a:hover { color: var(--ink); text-decoration: none; font-weight: 600; }
   .meta .stars { letter-spacing: 1px; color: var(--ink); }
 
   .nav { display: flex; gap: 10px; flex-shrink: 0; }
@@ -73,7 +73,7 @@
   .card.open .text { display: block; -webkit-line-clamp: unset; max-height: calc(7 * 1.55em); overflow-y: auto; padding-right: 6px; }  /* expands in place; widget height never changes */
   .more {
     align-self: flex-start; margin-top: 10px; padding: 0; border: 0; background: none; cursor: pointer;
-    font: 600 15px "Barlow", sans-serif; color: var(--ink); text-decoration: underline; text-underline-offset: 3px;
+    font: 600 15px "Barlow", sans-serif; color: var(--ink); text-decoration: none;
   }
   .who { margin-top: auto; padding-top: 18px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; border-top: 1.5px dashed var(--line); margin-top: auto; }
   .card .spacer { flex: 1; min-height: 14px; }
