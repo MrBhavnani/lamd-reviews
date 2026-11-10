@@ -39,9 +39,11 @@
   .nav { display: flex; gap: 10px; flex-shrink: 0; }
   .nav button {
     width: 46px; height: 46px; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink);
-    font: 600 20px/1 "Barlow", sans-serif; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
     border-radius: 48% 52% 50% 50% / 52% 48% 52% 48%;   /* slightly hand-drawn circle */
     transition: border-color .12s;
+  }
+  .nav button svg { width: 18px; height: 18px; display: block; flex: none;
   }
   .nav button:hover:not(:disabled) { border-color: var(--ink); }
   .nav button:disabled { opacity: .35; cursor: default; }
@@ -89,7 +91,8 @@
     :root { --per: 1; --gap: 16px; }
     .card { flex-basis: 86%; min-height: 0; }   /* peek of next card signals side-scroll */
     .head { align-items: center; }
-    .nav button { width: 40px; height: 40px; font-size: 18px; }
+    .nav button { width: 40px; height: 40px; }
+    .nav button svg { width: 16px; height: 16px; }
     .meta .stars { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { .track { scroll-behavior: auto; } }
@@ -103,8 +106,8 @@
       <div class="meta" id="meta"></div>
     </div>
     <div class="nav">
-      <button id="prev" aria-label="Previous reviews">&larr;</button>
-      <button id="next" aria-label="Next reviews">&rarr;</button>
+      <button id="prev" aria-label="Previous reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></button>
+      <button id="next" aria-label="Next reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>
     </div>
   </div>
   <div class="track" id="track" aria-live="polite"></div>
