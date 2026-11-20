@@ -76,6 +76,24 @@
   function highlight(s) { return esc(s).replace(kwRegexG, "<mark>$1</mark>"); }
   function safeUrl(u) { return /^https:\/\//i.test(u || "") ? u : ""; }
 
+  // Keep "X days/months ago" current. Google only gives a relative label ("2 months ago")
+  // as of the refresh date (scraped_at), so we turn that into an estimated post date
+  // and re-count from today every time the page loads. Unreadable labels show as-is.
+  const DAY = 86400000, UNIT = { minute: 1 / 1440, hour: 1 / 24, day: 1, week: 7, month: 30.44, year: 365.25 };
+  function liveAge(label, scrapedAt) {
+    const m = String(label || "").match(/(a|an|one|\d+)\s+(minute|hour|day|week|month|year)s?\s+ago/i);
+    const base = Date.parse(scrapedAt || "");
+    if (!m || isNaN(base)) return label || "";
+    const n = /^\d+$/.test(m[1]) ? +m[1] : 1;
+    const days = (Date.now() - (base - n * UNIT[m[2].toLowerCase()] * DAY)) / DAY;
+    const say = (k, u) => (k === 1 ? (u === "hour" ? "an " : "a ") + u : k + " " + u + "s") + " ago";
+    if (days < 1) return "today";
+    if (days < 7) return say(Math.floor(days), "day");
+    if (days < 30) return say(Math.floor(days / 7), "week");
+    if (days < 365) return say(Math.max(1, Math.floor(days / 30.44)), "month");
+    return say(Math.floor(days / 365.25), "year");
+  }
+
   function card(r) {
     const full = r.text || "";
     const needsCut = MAX_CHARS > 0 && full.length > MAX_CHARS;
@@ -134,7 +152,7 @@
     if (MAX_SHOWN > 0) list = list.slice(0, MAX_SHOWN);
     grid.innerHTML = "";
     if (!list.length) { grid.innerHTML = `<div class="rr-msg">Reviews coming soon.</div>`; return; }
-    list.forEach(r => grid.appendChild(card(r)));
+    list.forEach(r => grid.appendChild(card({ ...r, date: liveAge(r.date, data.scraped_at) })));
   }
 
   async function fetchJson(url) {
